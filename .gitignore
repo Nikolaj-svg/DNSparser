@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.env/
+.venv/
+venv/
+dns_parser_env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# macOS metadata
+.DS_Store
+
+# IDEs and editors
+.vscode/
+.idea/
+
+# Logs and runtime files
+*.log
+*.tmp
+*.bak
+
+# Output files
+*.xlsx
+*.xls
+*.csv
+*.db
+*.sqlite
+
+# Selenium driver
+driver/chromedriver
+
+# Python egg
+*.egg-info/
+*.egg
+
+# Compiled C extensions
+*.so
+
+# Coverage reports
+htmlcov/
+.coverage
+.cache
+
+# pytest
+.pytest_cache/
