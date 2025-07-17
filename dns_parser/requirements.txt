@@ -3,3 +3,9 @@ beautifulsoup4
 pandas
 openpyxl
 lxml
+tqdm
+selenium
+browser_cookie3
+undetected_chromedriver
+standard-distutils
+python3-tk

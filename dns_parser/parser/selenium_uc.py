@@ -1,4 +1,5 @@
 # parser/selenium_uc.py
+
 import time
 from typing import List, Dict
 from selenium.webdriver.common.by import By
@@ -6,26 +7,36 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # ─── CSS‑селекторы ────────────────────────────────────────────────
-CARD_SEL       = "div.catalog-product.ui-button-widget"
-SHOW_MORE_SEL  = "button.pagination-widget__show-more-btn"
+CARD_SEL = "div.catalog-product.ui-button-widget"
+SHOW_MORE_SEL = "button.pagination-widget__show-more-btn"
+ITEM_COUNT_SEL = "span.products-count"  # селектор для счётчика товаров
 
-# ─── основная функция ─────────────────────────────────────────────
-def grab_cards(driver,
-               url: str,
-               click_timeout: int = 10,
-               scroll_delay: float = 1.3) -> List[Dict[str, str]]:
+
+def get_total_items(driver):
     """
-    • driver – запущенный uc.Chrome
-    • url    – ссылка на категорию DNS
-    ↑ возвращает list[{uuid, href}]
+    Получает общее количество товаров в категории.
+    ↑ возвращает int или None
     """
+    try:
+        count_el = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ITEM_COUNT_SEL))
+        )
+        text = count_el.text.strip()
+        if text:
+            return int(text.split()[0])
+    except Exception as e:
+        print("❌ Не удалось получить количество товаров:", e)
+    return 0
+
+
+def grab_cards(driver, url: str, click_timeout: int = 10, scroll_delay: float = 1.3) -> List[Dict[str, str]]:
     wait = WebDriverWait(driver, 25)
     driver.get(url)
 
-    # ждём первую порцию карточек
+    # Ждём первую порцию карточек
     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, CARD_SEL)))
 
-    # кликаем «Показать ещё», пока кнопка есть и кликабельна
+    # Кликаем «Показать ещё», пока есть кнопка
     while True:
         try:
             btn = WebDriverWait(driver, click_timeout).until(
@@ -34,17 +45,17 @@ def grab_cards(driver,
             driver.execute_script("arguments[0].click();", btn)
             time.sleep(scroll_delay)
         except Exception:
-            break   # кнопка исчезла – все товары на странице загружены
+            break
 
-    # ── один JS‑вызов → список карточек -------------------------------------------------
+    # Используем JS для получения данных
     js = """
-        return [...document.querySelectorAll(arguments[0])]
-               .map(c => {
-                   return {
-                       uuid: c.dataset.product || "",
-                       href: (c.querySelector('a.catalog-product__name') || {}).href || ""
-                   };
-               });
+    return [...document.querySelectorAll(arguments[0])]
+           .map(c => {
+               return {
+                   uuid: c.dataset.product || "",
+                   href: (c.querySelector('a.catalog-product__name') || {}).href || ""
+               };
+           });
     """
     cards = driver.execute_script(js, CARD_SEL)
     print(f"🟢 Карточек найдено: {len(cards)}")
