@@ -82,26 +82,52 @@ def load_last_uuids(filename):
     return last_uuids
 
 
-def save_partial(category: str, products: list[dict]):
+def save_partial(category: str, products: list[dict], filename: str = "dns_full.xlsx"):
     """
     Добавляем/обновляем лист с учётом возможного появления новых столбцов.
+    Обрабатывает случаи:
+    - Файла не существует (создаёт новый)
+    - Лист существует (обновляет)
+    - Новые столбцы в данных (добавляет их)
     """
     if not products:
         return
 
-    sheet = category[:31]  # Excel‑лимит
+    sheet = category[:31]  # Excel-лимит на длину имени листа
     df_new = pd.DataFrame(products)
 
-    if os.path.exists(FILENAME):
-        with pd.ExcelFile(FILENAME) as xls:
-            if sheet in xls.sheet_names:
-                # Читаем старое, объединяем и сохраняем заново
-                df_old = pd.read_excel(xls, sheet_name=sheet)
-                df_new = pd.concat([df_old, df_new], ignore_index=True)
+    # Если файл существует - загружаем старые данные
+    if os.path.exists(filename):
+        try:
+            with pd.ExcelFile(filename) as xls:
+                if sheet in xls.sheet_names:
+                    df_old = pd.read_excel(xls, sheet_name=sheet)
+                    # Объединяем, удаляя дубликаты по UUID (если есть такой столбец)
+                    if 'uuid' in df_new.columns and 'uuid' in df_old.columns:
+                        df_new = pd.concat([df_old, df_new]).drop_duplicates('uuid', keep='last')
+                    else:
+                        df_new = pd.concat([df_old, df_new])
+        except Exception as e:
+            print(f"⚠️ Ошибка при чтении существующего файла: {e}")
+            # Продолжаем с новыми данными
 
-    # пишем/переписываем лист целиком
-    with pd.ExcelWriter(FILENAME, engine="openpyxl", mode="a", if_sheet_exists="replace") as w:
-        df_new.to_excel(w, sheet_name=sheet, index=False)
+    # Режим записи зависит от существования файла
+    mode = 'a' if os.path.exists(filename) else 'w'
+    
+    try:
+        with pd.ExcelWriter(filename, 
+                          engine="openpyxl", 
+                          mode=mode, 
+                          if_sheet_exists="replace") as writer:
+            df_new.to_excel(writer, sheet_name=sheet, index=False)
+    except Exception as e:
+        print(f"❌ Критическая ошибка при сохранении: {e}")
+        # Пробуем записать в новый файл как последнюю попытку
+        try:
+            with pd.ExcelWriter(filename, engine="openpyxl", mode='w') as writer:
+                df_new.to_excel(writer, sheet_name=sheet, index=False)
+        except Exception as e:
+            print(f"❌ Не удалось сохранить данные: {e}")
 
 def save_state(current_state):
     with open(STATE_FILE, 'w', encoding='utf-8') as f:
@@ -152,7 +178,7 @@ def run(mode="update", is_running=lambda: True):
             cards = []
             for attempt in (1, 2):
                 try:
-                    cards = grab_cards(driver, url)
+                    cards = grab_cards(driver, url, total_items)
                     break
                 except WebDriverException as e:
                     print(f"  ⛔ Selenium error (try {attempt}): {e.msg[:90]}…")
